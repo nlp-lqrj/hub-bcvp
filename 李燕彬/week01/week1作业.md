@@ -1,4 +1,4 @@
-## 20251012-week01-第一周作业内容
+## 20251012-week01-第一周作业
 
 - 作业1: 准备开发环境，参考[预习资料](https://note.youdao.com/s/BAcOYrOB)
 - 作业2: 配置github，并提交个人文件夹(作业提交用途) 参考[提交代码流程](https://note.youdao.com/s/KXGBGt8D)
