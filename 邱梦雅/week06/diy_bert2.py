@@ -56,7 +56,7 @@ class BertTorchModel(nn.Module):
         self.embedding_layer_norm_layer = nn.LayerNorm(self.hidden_size, eps=self.layer_norm_eps)
 
 
-        # 2. bert encoder(transformer)，后使用6层叠加
+        # 2. bert encoder(transformer) 使用6层叠加
         # self-attention 层
         # W_q, W_k, W_v 三个线性变换矩阵
         self.query_layer = nn.Linear(self.hidden_size, self.hidden_size)
