@@ -200,10 +200,10 @@ if __name__ == "__main__":
     # 不加"[]"维度是一维max_len，(4,)，加了"[]"维度是二维batch_size * max_len，(1, 4)
     # torch_x = torch.LongTensor(np.array(x))
 
-    #自制
+    # 自制
     btm = BertTorchModel(config, state_dict)
     diy_sequence_output, diy_pooler_output = btm.forward(torch_x)
-    #torch
+    # torch
     torch_sequence_output, torch_pooler_output = bert(torch_x)
     # print(bert.state_dict().keys())  #查看所有的权值矩阵名称
 
