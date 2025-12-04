@@ -53,11 +53,11 @@ class TorchModel(nn.Module):
 #{"a":1, "b":2, "c":3...}
 #abc -> [1,2,3]
 def build_vocab():
-    chars = "accdefghijklmnopqrstuvwxyz今日天气好狂暴到处都积水"  #字符集
+    chars = "abcdefghijklmnopqrstuvwxyz今日天气好狂暴到处都积水"  #字符集
     vocab = {"pad":0}
     for index, char in enumerate(chars):
         vocab[char] = index+1   #每个字对应一个序号
-    vocab['unk'] = len(vocab) #26
+    vocab['unk'] = len(vocab) + 1 #26
     return vocab
 
 #随机生成一个样本
