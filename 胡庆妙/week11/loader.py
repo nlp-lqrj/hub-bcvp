@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import json
+
+import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import BertTokenizer
@@ -11,13 +13,12 @@ from transformers import BertTokenizer
 
 
 class DataGenerator(Dataset):
-    def __init__(self, data_path, config, data_type="train"):
-        self.path = data_path
+    def __init__(self, path, config, data_type="train"):
+        self.path = path
         self.config = config
 
         self.tokenizer = BertTokenizer.from_pretrained(config["bert_model_path"])
         self.tokenizer.vocab[" "] = len(self.tokenizer.vocab)  # 在词表中增加空格符
-        self.tokenizer.vocab["[EOS]"] = len(self.tokenizer.vocab)  # 在词表中语句结束标识符
 
         self.data_type = data_type
         self.data = []
@@ -27,76 +28,56 @@ class DataGenerator(Dataset):
         with open(self.path, encoding="utf8") as f:
             for idx, line in enumerate(f):
                 line = json.loads(line)
-                ask = line["content"].strip()  # 样本中的问句
-                ans = line["title"].strip()  # 样本中的答句
+                ask = line["title"].strip()  # 样本中的问句
+                ans = line["content"].strip()  # 样本中的答句
 
                 if self.data_type == "train":
-                    # 针对一对问答样本，构建多条入参；每条入参用于模型的一次调用，每次调用仅预测答句的一个词。
-                    train_data = self.build_train_sample(ask, ans, self.config["input_max_length"], self.config["output_max_length"])
-                    input_ids_list, attention_mask_list, target_ids_list = train_data
-                    for i in range(len(input_ids_list)):
-                        self.data.append([input_ids_list[i], attention_mask_list[i], target_ids_list[i]])
+                    train_data = self.build_train_sample(ask, ans, self.config["max_length"])
+                    input_ids, attention_mask, target_ids = train_data
+                    self.data.append([input_ids, attention_mask, target_ids])
                 else:
                     self.data.append([ask, ans])
         return
 
-    def build_train_sample(self, ask, ans, ask_max_len, ans_max_len):
+    def build_train_sample(self, ask, ans, max_len):
         # 问句序列、答句序列
-        ask_seq = encode_sentence(self.tokenizer, ask, ask_max_len)
-        ans_seq = encode_sentence(self.tokenizer, ans, ans_max_len) + [self.tokenizer.vocab["[EOS]"]]  # [EOS]用于标识语句结束
-        combined_seq = ask_seq + [self.tokenizer.sep_token_id] + ans_seq  # [SEP]是分隔符，是decoder的起始token
-        sep_idx = len(ask_seq)  # [SEP]的位置
-        max_len = len(ask_seq) + 1  # 序列的长度
+        ask_seq = self.tokenizer.encode(ask, add_special_tokens=False)
+        ans_seq = self.tokenizer.encode(ans, add_special_tokens=False)
+        # [CLS] + ask_seq + [SEP] + ans_seq
+        input_ids = ([self.tokenizer.cls_token_id] + ask_seq
+                     + [self.tokenizer.sep_token_id]  # 中间[SEP]是分隔符
+                     + ans_seq)
+        # ask_seq + [SEP] + ans_seq + [SEP], 且问题部分设为-1(不参与loss计算)
+        target_ids = ([-1] + len(ask_seq) * [-1]
+                      + ans_seq
+                      + [self.tokenizer.sep_token_id])  # 末尾[SEP]标识语句结束
+        # 交叉注意力掩码
+        encoder_input_mask = np.ones((len(ask_seq) + 2, len(ask_seq) + 2), dtype=np.int32)  # 左上，全1
+        decoder_input_mask = np.zeros((len(ask_seq) + 2, len(ans_seq)), dtype=np.int32)  # 右上，全0
+        encoder_ouput_mask = np.ones((len(ans_seq), len(ask_seq) + 2), dtype=np.int32)  # 左下，全1
+        decoder_output_mask = np.tril(np.ones((len(ans_seq), len(ans_seq)), dtype=np.int32))  # 右下，下三角
+        input_mask = np.hstack([encoder_input_mask, decoder_input_mask])  # 水平拼接
+        output_mask = np.hstack([encoder_ouput_mask, decoder_output_mask])  # 水平拼接
+        attention_mask = np.vstack([input_mask, output_mask])  # 垂直拼接
 
-        input_ids_list = []
-        attention_mask_list = []
-        target_ids_list = []
-        for i in range(len(ask_seq)):  # i指向encoder的第一个token
-            if i + max_len >= len(combined_seq):
-                break
-            encoder_input_ids = combined_seq[i:sep_idx]
-            decoder_input_ids = combined_seq[sep_idx:sep_idx + i + 1]
+        # 截长、补齐
+        input_ids = input_ids[:max_len] + [self.tokenizer.pad_token_id] * (max_len - len(input_ids))
+        target_ids = target_ids[:max_len] + [self.tokenizer.pad_token_id] * (max_len - len(target_ids))
+        if attention_mask.shape[0] > max_len:
+            from_idx = min(len(input_ids), max_len)
+            attention_mask = attention_mask[:from_idx, :from_idx]
+        elif attention_mask.shape[0] < max_len:
+            pad_size = max_len - attention_mask.shape[0]
+            pad_width = ((0, pad_size), (0, pad_size))  # 行下方加pad_size行，列右侧加pad_size列
+            attention_mask = np.pad(attention_mask, pad_width, mode='constant', constant_values=0)
 
-            # 输入序列
-            input_ids = torch.tensor(combined_seq[i: i + max_len])
-            # 预期输出
-            target_ids = torch.tensor(combined_seq[i + 1: i + max_len + 1])
-
-            # 交叉注意力掩码
-            encoder_input_mask = torch.ones(len(encoder_input_ids), len(encoder_input_ids), dtype=torch.int32)  # 左上，全1
-            decoder_input_mask = torch.zeros(len(encoder_input_ids), len(decoder_input_ids), dtype=torch.int32)  # 右上，全0
-            encoder_ouput_mask = torch.ones(len(decoder_input_ids), len(encoder_input_ids), dtype=torch.int32)  # 左下，全1
-            decoder_output_mask = torch.tril(torch.ones(len(decoder_input_ids), len(decoder_input_ids), dtype=torch.int32))  # 右下，下三角
-            input_mask = torch.hstack([encoder_input_mask, decoder_input_mask])  # 水平拼接
-            output_mask = torch.hstack([encoder_ouput_mask, decoder_output_mask])  # 水平拼接
-            attention_mask = torch.vstack([input_mask, output_mask])  # 垂直拼接
-
-            input_ids_list.append(input_ids)
-            attention_mask_list.append(attention_mask)
-            target_ids_list.append(target_ids)
-
-            # print(">>", ask)
-            # print(">>", ans)
-            # print(">>", input_ids_list)
-            # print(">>", attention_mask_list)
-            # print(">>", target_ids_list)
-        return input_ids_list, attention_mask_list, target_ids_list
+        return torch.tensor(input_ids), torch.tensor(attention_mask), torch.tensor(target_ids)
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, index):
         return self.data[index]
-
-
-def encode_sentence(tokenizer, sentence, max_length, padding=True):
-    return tokenizer.encode(
-        sentence,
-        add_special_tokens=False,
-        max_length=max_length,
-        padding=('max_length' if padding else 'do_not_pad'),
-        truncation=True
-    )
 
 
 # 用torch自带的DataLoader类封装数据
