@@ -1,0 +1,60 @@
+正在使用 lora_tuning
+base_model.model.bert_like.encoder.layer.0.attention.self.query.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.0.attention.self.query.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.0.attention.self.key.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.0.attention.self.key.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.0.attention.self.value.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.0.attention.self.value.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.1.attention.self.query.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.1.attention.self.query.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.1.attention.self.key.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.1.attention.self.key.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.1.attention.self.value.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.1.attention.self.value.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.2.attention.self.query.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.2.attention.self.query.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.2.attention.self.key.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.2.attention.self.key.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.2.attention.self.value.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.2.attention.self.value.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.3.attention.self.query.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.3.attention.self.query.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.3.attention.self.key.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.3.attention.self.key.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.3.attention.self.value.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.3.attention.self.value.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.4.attention.self.query.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.4.attention.self.query.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.4.attention.self.key.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.4.attention.self.key.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.4.attention.self.value.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.4.attention.self.value.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.5.attention.self.query.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.5.attention.self.query.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.5.attention.self.key.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.5.attention.self.key.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.bert_like.encoder.layer.5.attention.self.value.lora_A.default.weight : torch.Size([8, 768])
+base_model.model.bert_like.encoder.layer.5.attention.self.value.lora_B.default.weight : torch.Size([768, 8])
+base_model.model.classify.weight : torch.Size([9, 768])
+base_model.model.classify.bias : torch.Size([9])
+base_model.model.crf_layer.start_transitions : torch.Size([9])
+base_model.model.crf_layer.end_transitions : torch.Size([9])
+base_model.model.crf_layer.transitions : torch.Size([9, 9])
+模型加载完毕!
+pred_labels: [6, 8, 8, 2, 6, 6, 6, 6, 6, 3, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 4, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
+PERSON : ['纳扎尔巴耶夫']
+TIME : ['最近']
+defaultdict(<class 'list'>, {'PERSON': ['纳扎尔巴耶夫'], 'TIME': ['最近']})
+==============
+pred_labels: [3, 7, 7, 7, 8, 0, 4, 8, 8, 2, 6, 6, 8, 0, 4, 4, 8, 8, 2, 6, 6, 8, 0, 4, 8, 8, 2, 6, 8, 8, 8, 8, 8, 8, 8, 0, 4, 4, 8, 8, 8, 8, 8]
+LOCATION : ['法国', '俄罗斯', '德国', '莫斯科']
+PERSON : ['希拉克', '叶利钦', '科尔']
+TIME : ['二十六日']
+defaultdict(<class 'list'>, {'LOCATION': ['法国', '俄罗斯', '德国', '莫斯科'], 'PERSON': ['希拉克', '叶利钦', '科尔'], 'TIME': ['二十六日']})
+==============
+pred_labels: [1, 5, 5, 5, 8, 8, 0, 4, 5, 5, 5, 5, 5, 5, 5, 5, 3, 7, 8, 8, 8, 8, 8, 8, 1, 5, 5, 5, 5, 5, 8, 8, 2, 6, 6, 8, 8, 8, 8, 8, 0, 4, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 1, 5, 5, 5, 5, 5, 5, 5, 5, 8, 8, 2, 6, 6, 8, 8, 8, 3, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 1, 5, 5, 5, 8, 8, 8, 8, 8, 2, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 8, 2, 6, 6, 8, 8, 8, 8, 8, 8, 8, 1, 5, 5, 5, 5, 8, 8, 8, 2, 6, 6, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 3, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
+LOCATION : ['北京', '亚洲']
+ORGANIZATION : ['法国芭蕾', '中国人民银行', '国家发展计划委员会', '中央党校', '中央统战部']
+PERSON : ['戴相龙', '曾培炎', '郑必坚', '邓小平', '刘延东']
+TIME : ['明晚', '当前', '2000年']
+defaultdict(<class 'list'>, {'LOCATION': ['北京', '亚洲'], 'ORGANIZATION': ['法国芭蕾', '中国人民银行', '国家发展计划委员会', '中央党校', '中央统战部'], 'PERSON': ['戴相龙', '曾培炎', '郑必坚', '邓小平', '刘延东'], 'TIME': ['明晚', '当前', '2000年']})
