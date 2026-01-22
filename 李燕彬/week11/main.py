@@ -37,6 +37,7 @@ def main(save_weight=True):
     train_sample = Config["train_sample"]  # 每轮训练总共训练的样本总数
     max_input_len = Config["max_input_len"]  # 输入序列最大长度(title)
     max_output_len = Config["max_output_len"]  # 输出序列最大长度(content)
+    # window_size = Config["window_size"]  # 样本长度
     text_length = Config["text_length"]  # 生成文本长度
 
     # 加载优化器
