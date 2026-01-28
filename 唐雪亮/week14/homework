@@ -1,0 +1,593 @@
+"""
+银行存贷产品Agent示例 - 演示大语言模型的function call能力
+展示从用户输入 -> 工具调用 -> 最终回复的完整流程
+"""
+
+import os
+import json
+from openai import OpenAI
+
+
+# ==================== 工具函数定义 ====================
+# 银行存贷产品核心工具函数
+
+def get_bank_products():
+    """
+    获取所有可用的银行存贷产品列表
+    """
+    products = [
+        {
+            "id": "deposit_001",
+            "name": "定期存款（整存整取）",
+            "type": "存款",
+            "description": "本金安全，收益稳定的定期存款产品",
+            "min_amount": 50,
+            "max_amount": 10000000,
+            "min_years": 0.5,  # 半年
+            "max_years": 5,
+            "base_rate": 1.65  # 年化利率（%）
+        },
+        {
+            "id": "deposit_002",
+            "name": "大额存单",
+            "type": "存款",
+            "description": "高门槛高利率的大额定期存款",
+            "min_amount": 200000,
+            "max_amount": 5000000,
+            "min_years": 1,
+            "max_years": 3,
+            "base_rate": 2.1  # 年化利率（%）
+        },
+        {
+            "id": "loan_001",
+            "name": "个人消费贷款",
+            "type": "贷款",
+            "description": "用于日常消费的信用贷款",
+            "min_amount": 10000,
+            "max_amount": 500000,
+            "min_years": 1,
+            "max_years": 5,
+            "base_rate": 4.85  # 年化利率（%）
+        },
+        {
+            "id": "loan_002",
+            "name": "个人住房按揭贷款",
+            "type": "贷款",
+            "description": "用于购买住房的按揭贷款",
+            "min_amount": 100000,
+            "max_amount": 5000000,
+            "min_years": 5,
+            "max_years": 30,
+            "base_rate": 3.75  # 年化利率（%）
+        }
+    ]
+    return json.dumps(products, ensure_ascii=False)
+
+
+def get_product_detail(product_id: str):
+    """
+    获取指定银行产品的详细信息
+
+    Args:
+        product_id: 产品ID
+    """
+    products = {
+        "deposit_001": {
+            "id": "deposit_001",
+            "name": "定期存款（整存整取）",
+            "type": "存款",
+            "description": "本金安全，收益稳定的定期存款产品，支持提前支取（按活期计息）",
+            "min_amount": 50,
+            "max_amount": 10000000,
+            "term_options": [0.5, 1, 2, 3, 5],  # 可选择的存期（年）
+            "rate_by_term": {0.5: 1.35, 1: 1.65, 2: 1.85, 3: 1.95, 5: 2.05},  # 不同存期对应利率（%）
+            "tax_note": "存款利息暂免征收个人所得税"
+        },
+        "deposit_002": {
+            "id": "deposit_002",
+            "name": "大额存单",
+            "type": "存款",
+            "description": "高门槛高利率的大额定期存款，支持转让，不支持提前支取",
+            "min_amount": 200000,
+            "max_amount": 5000000,
+            "term_options": [1, 2, 3],
+            "rate_by_term": {1: 2.1, 2: 2.25, 3: 2.4},
+            "tax_note": "存款利息暂免征收个人所得税"
+        },
+        "loan_001": {
+            "id": "loan_001",
+            "name": "个人消费贷款",
+            "type": "贷款",
+            "description": "无抵押无担保的信用贷款，用于日常消费，不得用于投资",
+            "min_amount": 10000,
+            "max_amount": 500000,
+            "term_options": [1, 2, 3, 4, 5],
+            "rate_by_term": {1: 4.85, 2: 5.0, 3: 5.15, 4: 5.3, 5: 5.45},
+            "repayment_method": "等额本息/等额本金",
+            "age_limit": "18-60周岁",
+            "credit_note": "利率会根据个人征信情况浮动±10%"
+        },
+        "loan_002": {
+            "id": "loan_002",
+            "name": "个人住房按揭贷款",
+            "type": "贷款",
+            "description": "用于购买商品住房的按揭贷款，需提供房产抵押",
+            "min_amount": 100000,
+            "max_amount": 5000000,
+            "term_options": [5, 10, 15, 20, 25, 30],
+            "rate_by_term": {5: 3.75, 10: 3.85, 15: 3.95, 20: 4.05, 25: 4.15, 30: 4.25},
+            "repayment_method": "等额本息/等额本金",
+            "age_limit": "18-65周岁",
+            "down_payment": "首套房最低20%，二套房最低30%"
+        }
+    }
+
+    if product_id in products:
+        return json.dumps(products[product_id], ensure_ascii=False)
+    else:
+        return json.dumps({"error": "产品不存在"}, ensure_ascii=False)
+
+
+def calculate_deposit_interest(product_id: str, deposit_amount: int, years: float):
+    """
+    计算存款利息（单利计算）
+
+    Args:
+        product_id: 产品ID
+        deposit_amount: 存款金额（元）
+        years: 存款年限
+    """
+    # 获取产品详情
+    product_detail = json.loads(get_product_detail(product_id))
+    if "error" in product_detail:
+        return json.dumps({"error": "产品不存在"}, ensure_ascii=False)
+
+    if product_detail["type"] != "存款":
+        return json.dumps({"error": "该产品不是存款产品，无法计算利息"}, ensure_ascii=False)
+
+    # 验证年限是否在可选范围内
+    if years not in product_detail["term_options"]:
+        return json.dumps({"error": f"该产品不支持{years}年期限，可选期限：{product_detail['term_options']}"}, ensure_ascii=False)
+
+    # 获取对应年限的利率
+    rate = product_detail["rate_by_term"][str(years)] / 100
+
+    # 计算利息（单利）
+    total_interest = deposit_amount * rate * years
+    maturity_amount = deposit_amount + total_interest
+
+    result = {
+        "product_id": product_id,
+        "product_name": product_detail["name"],
+        "deposit_amount": deposit_amount,
+        "years": years,
+        "annual_rate": f"{rate*100}%",
+        "total_interest": round(total_interest, 2),
+        "maturity_amount": round(maturity_amount, 2),
+        "calculation_method": "单利计算",
+        "tax_note": product_detail["tax_note"]
+    }
+
+    return json.dumps(result, ensure_ascii=False)
+
+
+def calculate_loan_repayment(product_id: str, loan_amount: int, years: float, repayment_method: str = "等额本息"):
+    """
+    计算贷款还款金额（等额本息/等额本金）
+
+    Args:
+        product_id: 产品ID
+        loan_amount: 贷款金额（元）
+        years: 贷款年限
+        repayment_method: 还款方式（等额本息/等额本金）
+    """
+    # 获取产品详情
+    product_detail = json.loads(get_product_detail(product_id))
+    if "error" in product_detail:
+        return json.dumps({"error": "产品不存在"}, ensure_ascii=False)
+
+    if product_detail["type"] != "贷款":
+        return json.dumps({"error": "该产品不是贷款产品，无法计算还款金额"}, ensure_ascii=False)
+
+    # 验证年限是否在可选范围内
+    if years not in product_detail["term_options"]:
+        return json.dumps({"error": f"该产品不支持{years}年期限，可选期限：{product_detail['term_options']}"}, ensure_ascii=False)
+
+    # 获取对应年限的年利率
+    annual_rate = product_detail["rate_by_term"][str(years)] / 100
+    # 月利率
+    monthly_rate = annual_rate / 12
+    # 还款总月数
+    total_months = int(years * 12)
+
+    result = {
+        "product_id": product_id,
+        "product_name": product_detail["name"],
+        "loan_amount": loan_amount,
+        "years": years,
+        "total_months": total_months,
+        "annual_rate": f"{annual_rate*100}%",
+        "monthly_rate": f"{monthly_rate*100:.4f}%",
+        "repayment_method": repayment_method
+    }
+
+    if repayment_method == "等额本息":
+        # 等额本息计算公式：每月还款额 = 贷款本金×月利率×(1+月利率)^还款月数 ÷ [(1+月利率)^还款月数－1]
+        if monthly_rate == 0:
+            monthly_payment = loan_amount / total_months
+        else:
+            monthly_payment = loan_amount * monthly_rate * (1 + monthly_rate)**total_months / ((1 + monthly_rate)**total_months - 1)
+        total_repayment = monthly_payment * total_months
+        total_interest = total_repayment - loan_amount
+
+        result.update({
+            "monthly_payment": round(monthly_payment, 2),
+            "total_repayment": round(total_repayment, 2),
+            "total_interest": round(total_interest, 2),
+            "note": "每月还款金额固定"
+        })
+
+    elif repayment_method == "等额本金":
+        # 等额本金计算公式：每月还款额 = (贷款本金÷还款月数) + (贷款本金－已归还本金累计额)×月利率
+        monthly_principal = loan_amount / total_months
+        # 首月还款额
+        first_month_payment = monthly_principal + loan_amount * monthly_rate
+        # 末月还款额
+        last_month_payment = monthly_principal + monthly_principal * monthly_rate
+        # 总利息
+        total_interest = (loan_amount * monthly_rate * (total_months + 1)) / 2
+        total_repayment = loan_amount + total_interest
+
+        result.update({
+            "monthly_principal": round(monthly_principal, 2),
+            "first_month_payment": round(first_month_payment, 2),
+            "last_month_payment": round(last_month_payment, 2),
+            "total_repayment": round(total_repayment, 2),
+            "total_interest": round(total_interest, 2),
+            "note": "每月还款本金固定，利息逐月递减，首月还款金额最高"
+        })
+
+    else:
+        return json.dumps({"error": "还款方式仅支持等额本息/等额本金"}, ensure_ascii=False)
+
+    return json.dumps(result, ensure_ascii=False)
+
+
+def compare_products(product_ids: list, amount: int, years: float):
+    """
+    比较多个银行产品的收益/还款情况
+
+    Args:
+        product_ids: 产品ID列表
+        amount: 存/贷款金额（元）
+        years: 存/贷款年限
+    """
+    comparisons = []
+
+    for product_id in product_ids:
+        product_detail = json.loads(get_product_detail(product_id))
+        if "error" in product_detail:
+            continue
+
+        comparison_item = {
+            "product_id": product_id,
+            "product_name": product_detail["name"],
+            "product_type": product_detail["type"],
+            "amount": amount,
+            "years": years
+        }
+
+        # 存款产品计算利息
+        if product_detail["type"] == "存款":
+            interest_result = json.loads(calculate_deposit_interest(product_id, amount, years))
+            if "error" not in interest_result:
+                comparison_item.update({
+                    "annual_rate": interest_result["annual_rate"],
+                    "total_interest": interest_result["total_interest"],
+                    "final_amount": interest_result["maturity_amount"]
+                })
+                comparisons.append(comparison_item)
+
+        # 贷款产品计算等额本息还款
+        elif product_detail["type"] == "贷款":
+            loan_result = json.loads(calculate_loan_repayment(product_id, amount, years, "等额本息"))
+            if "error" not in loan_result:
+                comparison_item.update({
+                    "annual_rate": loan_result["annual_rate"],
+                    "monthly_payment": loan_result["monthly_payment"],
+                    "total_interest": loan_result["total_interest"],
+                    "total_repayment": loan_result["total_repayment"]
+                })
+                comparisons.append(comparison_item)
+
+    result = {
+        "comparison_params": {
+            "amount": amount,
+            "years": years
+        },
+        "products": comparisons
+    }
+
+    return json.dumps(result, ensure_ascii=False)
+
+
+# ==================== 工具函数的JSON Schema定义 ====================
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_bank_products",
+            "description": "获取所有可用的银行存贷产品列表，包括产品名称、类型、金额范围、年限范围、基础利率等基本信息",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_product_detail",
+            "description": "获取指定银行产品的详细信息，包括期限选项、不同期限利率、还款方式、年龄限制等",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_id": {
+                        "type": "string",
+                        "description": "产品ID，例如：deposit_001, deposit_002, loan_001, loan_002"
+                    }
+                },
+                "required": ["product_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "calculate_deposit_interest",
+            "description": "计算存款产品的利息和到期本息总额（单利计算）",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_id": {
+                        "type": "string",
+                        "description": "存款产品ID"
+                    },
+                    "deposit_amount": {
+                        "type": "integer",
+                        "description": "存款金额（元）"
+                    },
+                    "years": {
+                        "type": "number",
+                        "description": "存款年限（支持小数，如0.5表示半年）"
+                    }
+                },
+                "required": ["product_id", "deposit_amount", "years"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "calculate_loan_repayment",
+            "description": "计算贷款产品的还款金额，支持等额本息和等额本金两种还款方式",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_id": {
+                        "type": "string",
+                        "description": "贷款产品ID"
+                    },
+                    "loan_amount": {
+                        "type": "integer",
+                        "description": "贷款金额（元）"
+                    },
+                    "years": {
+                        "type": "number",
+                        "description": "贷款年限"
+                    },
+                    "repayment_method": {
+                        "type": "string",
+                        "description": "还款方式，可选值：等额本息（默认）、等额本金",
+                        "default": "等额本息"
+                    }
+                },
+                "required": ["product_id", "loan_amount", "years"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "compare_products",
+            "description": "比较多个银行产品在相同金额和年限下的收益（存款）或还款（贷款）差异",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "要比较的产品ID列表"
+                    },
+                    "amount": {
+                        "type": "integer",
+                        "description": "存/贷款金额（元）"
+                    },
+                    "years": {
+                        "type": "number",
+                        "description": "存/贷款年限"
+                    }
+                },
+                "required": ["product_ids", "amount", "years"]
+            }
+        }
+    }
+]
+
+# ==================== Agent核心逻辑 ====================
+
+# 工具函数映射
+available_functions = {
+    "get_bank_products": get_bank_products,
+    "get_product_detail": get_product_detail,
+    "calculate_deposit_interest": calculate_deposit_interest,
+    "calculate_loan_repayment": calculate_loan_repayment,
+    "compare_products": compare_products
+}
+
+
+def run_agent(user_query: str, api_key: str = "your_key", model: str = "qwen-plus"):
+    """
+    运行Agent，处理用户查询
+
+    Args:
+        user_query: 用户输入的问题
+        api_key: API密钥（如果不提供则从环境变量读取）
+        model: 使用的模型名称
+    """
+    # 初始化OpenAI客户端
+    client = OpenAI(
+        api_key=api_key or os.getenv("your_key"),
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    )
+
+    # 初始化对话历史
+    messages = [
+        {
+            "role": "system",
+            "content": """你是一位专业的银行理财顾问助手。你可以：
+1. 介绍各种银行存贷产品及其详细信息
+2. 根据客户需求计算存款利息和到期本息
+3. 根据客户需求计算贷款还款金额（等额本息/等额本金）
+4. 比较不同银行产品的收益或还款差异
+
+请根据用户的问题，使用合适的工具来获取信息并给出专业的建议。"""
+        },
+        {
+            "role": "user",
+            "content": user_query
+        }
+    ]
+
+    print("\n" + "=" * 60)
+    print("【用户问题】")
+    print(user_query)
+    print("=" * 60)
+
+    # Agent循环：最多进行5轮工具调用
+    max_iterations = 5
+    iteration = 0
+
+    while iteration < max_iterations:
+        iteration += 1
+        print(f"\n--- 第 {iteration} 轮Agent思考 ---")
+
+        # 调用大模型
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            tools=tools,
+            tool_choice="auto"  # 让模型自主决定是否调用工具
+        )
+
+        response_message = response.choices[0].message
+        print(f"LLM返回的消息：{response_message}")
+
+        # 将模型响应加入对话历史
+        messages.append(response_message)
+
+        # 检查是否需要调用工具
+        tool_calls = response_message.tool_calls
+
+        if not tool_calls:
+            # 没有工具调用，说明模型已经给出最终答案
+            print("\n【Agent最终回复】")
+            print(response_message.content)
+            print("=" * 60)
+            return response_message.content
+
+        # 执行工具调用
+        print(f"\n【Agent决定调用 {len(tool_calls)} 个工具】")
+
+        for tool_call in tool_calls:
+            function_name = tool_call.function.name
+            function_args = json.loads(tool_call.function.arguments)
+
+            print(f"\n工具名称: {function_name}")
+            print(f"工具参数: {json.dumps(function_args, ensure_ascii=False, indent=2)}")
+
+            # 执行对应的函数
+            if function_name in available_functions:
+                function_to_call = available_functions[function_name]
+                function_response = function_to_call(**function_args)
+
+                print(f"工具返回: {function_response[:200]}..." if len(
+                    function_response) > 200 else f"工具返回: {function_response}")
+
+                # 将工具调用结果加入对话历史
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "name": function_name,
+                    "content": function_response
+                })
+            else:
+                print(f"错误：未找到工具 {function_name}")
+
+    print("\n【警告】达到最大迭代次数，Agent循环结束")
+    return "抱歉，处理您的请求时遇到了问题。"
+
+
+# ==================== 示例场景 ====================
+
+def demo_scenarios():
+    """
+    演示几个典型场景
+    """
+    print("\n" + "#" * 60)
+    print("# 银行存贷产品Agent演示 - Function Call能力展示")
+    print("#" * 60)
+
+    scenarios = [
+        "你们有哪些存贷产品？",
+        "我想了解一下大额存单的详细信息",
+        "我存20万大额存单3年，能拿到多少利息？",
+        "我贷款100万买房，按揭30年，等额本息每月还多少？",
+        "帮我比较一下定期存款和大额存单，存50万3年的收益差异"
+    ]
+
+    print("\n以下是几个示例场景，您可以选择其中一个运行：\n")
+    for i, scenario in enumerate(scenarios, 1):
+        print(f"{i}. {scenario}")
+
+    print("\n" + "-" * 60)
+    print("要运行示例，请取消注释main函数中的相应代码")
+    print("并确保设置了环境变量：DASHSCOPE_API_KEY")
+    print("-" * 60)
+
+
+if __name__ == "__main__":
+    # 展示示例场景
+    # demo_scenarios()
+
+    # 运行示例（取消注释下面的代码来运行）
+    # 注意：需要先设置环境变量 DASHSCOPE_API_KEY
+
+    # 示例1：查询产品列表
+    # run_agent("你们有哪些存贷产品？", model="qwen-plus")
+
+    # 示例2：查询产品详情
+    # run_agent("我想了解一下大额存单的详细信息", model="qwen-plus")
+
+    # 示例3：计算存款利息
+    # run_agent("我存20万大额存单3年，能拿到多少利息？", model="qwen-plus")
+
+    # 示例4：计算贷款还款
+    # run_agent("我贷款100万买房，按揭30年，等额本息每月还多少？", model="qwen-plus")
+
+    # 示例5：比较产品
+    run_agent("帮我比较一下定期存款和大额存单，存50万3年的收益差异", model="qwen-plus")
+
+    # 自定义查询
+    # run_agent("你的问题", model="qwen-plus")
